@@ -1,0 +1,23 @@
+{
+  "name": "receiptgen",
+  "version": "1.0.0",
+  "description": "Local-first receipt generator with PDF/PNG export and persistent storage.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "NODE_ENV=development node server.js"
+  },
+  "keywords": [
+    "receipt",
+    "generator",
+    "pdf",
+    "png"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.3"
+  }
+}
