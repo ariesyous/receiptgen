@@ -13,6 +13,8 @@ const dom = {
   autoPdf: document.getElementById('auto-download-pdf'),
   showFooter: document.getElementById('show-footer-message'),
   showThanks: document.getElementById('show-thankyou-line'),
+  enableServerSave: document.getElementById('enable-server-save'),
+  serverStatus: document.getElementById('server-status'),
   generateBtn: document.getElementById('generate-btn'),
   outputPanel: document.getElementById('output-panel'),
   saveStatus: document.getElementById('save-status'),
@@ -103,6 +105,7 @@ let lastImageDataUrl = null;
 let lastCanvasDimensions = { width: 0, height: 0 };
 let lastFileBase = 'receipt';
 let isGenerating = false;
+let serverAvailable = false;
 
 const defaultItems = [
   { description: 'Cold Brew', qty: 1, price: 4.5 },
@@ -385,6 +388,70 @@ const persistReceipt = async (imageData, fileBase, meta) => {
   return response.json();
 };
 
+const optionallyPersistReceipt = async (data, totals, dataUrl, fileBase) => {
+  if (!dom.enableServerSave?.checked || !serverAvailable) {
+    dom.outputPanel.hidden = false;
+    dom.saveStatus.textContent = 'Generated locally. Server save disabled.';
+    return;
+  }
+
+  try {
+    const response = await persistReceipt(dataUrl, fileBase, {
+      storeName: data.storeName,
+      receiptId: data.receiptId,
+      total: totals.total,
+      type: data.type,
+    });
+    dom.saveStatus.textContent = `Saved copy inside container as /${response.relativePath}`;
+  } catch (saveError) {
+    console.error('Failed to save receipt to disk', saveError);
+    dom.saveStatus.textContent = 'Generated receipt, but failed to save a copy to disk.';
+  } finally {
+    dom.outputPanel.hidden = false;
+  }
+};
+
+const updateServerStatus = ({ available, message, canEnable }) => {
+  serverAvailable = available;
+  if (!dom.serverStatus) return;
+  dom.serverStatus.textContent = message;
+  dom.serverStatus.classList.toggle('status-ok', available);
+  dom.serverStatus.classList.toggle('status-error', !available);
+  if (dom.enableServerSave) {
+    dom.enableServerSave.disabled = !canEnable;
+    if (!canEnable) {
+      dom.enableServerSave.checked = false;
+    }
+  }
+};
+
+const checkServerAvailability = async () => {
+  if (!window.fetch) {
+    updateServerStatus({
+      available: false,
+      canEnable: false,
+      message: 'Browser missing fetch support, running locally.',
+    });
+    return;
+  }
+  try {
+    const response = await fetch('/api/health', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Health check failed');
+    updateServerStatus({
+      available: true,
+      canEnable: true,
+      message: 'Backend ready. Enable server save if desired.',
+    });
+  } catch (error) {
+    console.warn('Server unavailable', error);
+    updateServerStatus({
+      available: false,
+      canEnable: false,
+      message: 'Backend unavailable. Downloads still work.',
+    });
+  }
+};
+
 const buildFileBase = (data) => {
   const parts = [data.storeName, data.receiptId].map(slugify).filter(Boolean);
   const stamp = new Date().toISOString().slice(0, 10);
@@ -438,20 +505,7 @@ const handleGenerate = async (event) => {
       downloadPdf(dataUrl, fileBase, canvas.width, canvas.height);
     }
 
-    try {
-      const response = await persistReceipt(dataUrl, fileBase, {
-        storeName: data.storeName,
-        receiptId: data.receiptId,
-        total: totals.total,
-        type: data.type,
-      });
-      dom.saveStatus.textContent = `Saved copy inside container as /${response.relativePath}`;
-    } catch (saveError) {
-      console.error('Failed to save receipt to disk', saveError);
-      dom.saveStatus.textContent = 'Generated receipt, but failed to save a copy to disk.';
-    }
-
-    dom.outputPanel.hidden = false;
+    await optionallyPersistReceipt(data, totals, dataUrl, fileBase);
   } catch (error) {
     console.error(error);
     dom.saveStatus.textContent = 'Generation failed. Check console for details.';
@@ -489,6 +543,8 @@ const init = () => {
       lastCanvasDimensions.height
     );
   });
+
+  checkServerAvailability();
 };
 
 init();

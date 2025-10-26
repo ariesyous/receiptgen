@@ -181,6 +181,12 @@ legend {
   margin: 0;
 }
 
+.helptext {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 button[type='submit'],
 .secondary {
   border: none;
@@ -332,6 +338,14 @@ button:hover:not(:disabled) {
   font-style: italic;
   color: #555;
   margin: 0.2rem 0 0.4rem;
+}
+
+.status-ok {
+  color: #1c7c54;
+}
+
+.status-error {
+  color: #c03434;
 }
 
 .items-header,

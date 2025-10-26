@@ -7,6 +7,7 @@ Local-first web UI that lets you craft realistic retail receipts, export them to
 - Dynamic line items with quantity/price math, taxes, and discounts.
 - Toggleable templates for Retail vs Taxi receipts (ride metadata + fare builder) without overloading the UI.
 - One-click PNG/PDF export powered by `html2canvas` + `jsPDF`.
+- Optional backend persistence: health-check gate keeps the UI in front-end-only mode (safe for GitHub Pages) until a server is reachable.
 - Automatic persistence to `data/receipts/` (or any directory via `RECEIPT_OUTPUT_DIR`), so containers with attached volumes always retain generated receipts.
 
 ## Local development
@@ -17,6 +18,12 @@ npm start
 ```
 
 Receipts are saved as timestamped PNG files in `data/receipts/`.
+
+### Front-end-only / GitHub Pages mode
+- The UI serves fine as static files (e.g., GitHub Pages) because PNG/PDF generation runs entirely in-browser.
+- A backend health check runs on load:
+  - If `/api/health` responds, the “Save a copy to server volume” checkbox becomes available.
+  - On static hosts the toggle stays disabled, preventing failed requests while still allowing downloads.
 
 ## Docker
 ```bash
