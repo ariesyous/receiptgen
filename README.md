@@ -44,6 +44,13 @@ docker run -d --name receiptgen \
 
 By default the server listens on `PORT` (defaults to 3000) and writes receipts to `RECEIPT_OUTPUT_DIR` (defaults to `/app/data/receipts`). Override either variable when launching the container if needed.
 
+## GitHub Pages deployment
+Pushes to `main` automatically run `.github/workflows/deploy-pages.yml`, which copies the static assets from `public/` and publishes them to the `gh-pages` environment using the official Pages actions. One-time setup:
+1. In the repo settings → Pages, set the source to “GitHub Actions”.
+2. Merge/push to `main`; the workflow uploads the `dist/` artifact and deploys it.
+
+The hosted site runs the front-end only (server persistence stays disabled), but PNG/PDF downloads continue to work in the browser.
+
 ## Project structure
 - `public/` – static assets, UI, and vendorized browser libraries.
 - `server.js` – Express server that serves the UI and writes uploaded receipts.

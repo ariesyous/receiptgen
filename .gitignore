@@ -4,6 +4,7 @@ node_modules/
 # Local data exports
 data/receipts/
 receipts/
+dist/
 
 # Logs & OS junk
 npm-debug.log*
