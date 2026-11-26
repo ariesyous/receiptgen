@@ -3,315 +3,187 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Create a retail or taxi receipt and download it as a PNG or paper-sized PDF." />
+    <meta name="theme-color" content="#f3f5f8" />
     <title>Receipt Generator</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <section class="form-panel">
-        <header>
-          <p class="eyebrow">Local Only</p>
-          <h1>Receipt Generator</h1>
-          <p class="lede">
-            Fill in your store details, add line items, and generate a realistic receipt that you can
-            export as PNG/PDF. Every run also saves a copy inside the container for safekeeping.
-          </p>
-        </header>
+    <header class="masthead">
+      <div class="masthead-inner">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i></span><h1>Receipt Generator</h1></div>
+        <a class="mobile-link" href="#preview">Preview &amp; export</a>
+        <fieldset id="receipt-type" class="type-picker">
+          <legend class="sr-only">Receipt type</legend>
+          <label><input type="radio" name="receipt-type" value="retail" checked /><span>Retail</span></label>
+          <label><input type="radio" name="receipt-type" value="taxi" /><span>Taxi</span></label>
+        </fieldset>
+      </div>
+    </header>
 
-        <form id="receipt-form" autocomplete="off">
-          <div class="field-grid">
-            <label class="full-span">
-              <span>Receipt type</span>
-              <select id="receipt-type">
-                <option value="retail">Retail / Store</option>
-                <option value="taxi">Taxi / Ride Service</option>
-              </select>
-            </label>
-            <label>
-              <span>Store / Service name</span>
-              <input type="text" id="store-name" value="Cornerstone Market" required />
-            </label>
-            <label>
-              <span>Tagline</span>
-              <input type="text" id="store-tagline" value="Fresh Goods • Open Late" />
-            </label>
-            <label>
-              <span>Address or office</span>
-              <input type="text" id="store-address" value="123 Harbor Ave, Springfield" />
-            </label>
-            <label>
-              <span>Phone / Contact</span>
-              <input type="text" id="store-phone" value="(555) 013-7788" />
-            </label>
-          </div>
-
-          <div class="field-grid">
-            <label>
-              <span>Receipt # / Trip ID</span>
-              <input type="text" id="receipt-id" value="A104829" />
-            </label>
-            <label>
-              <span>Register / Vehicle ID</span>
-              <input type="text" id="register-id" value="02" />
-            </label>
-            <label>
-              <span>Cashier / Driver</span>
-              <input type="text" id="cashier-name" value="M. Harris" />
-            </label>
-            <label>
-              <span>Date &amp; time</span>
-              <input type="datetime-local" id="purchase-datetime" />
-            </label>
-          </div>
-
-          <fieldset class="taxi-fieldset" data-template="taxi">
-            <legend>Taxi ride details</legend>
-            <div class="field-grid">
-              <label>
-                <span>Passenger</span>
-                <input type="text" id="taxi-passenger" value="Jordan Miles" />
-              </label>
-              <label>
-                <span>Pickup location</span>
-                <input type="text" id="taxi-pickup" value="241 Market St" />
-              </label>
-              <label>
-                <span>Drop-off location</span>
-                <input type="text" id="taxi-dropoff" value="11 Cedar Ave" />
-              </label>
-              <label>
-                <span>Driver name</span>
-                <input type="text" id="taxi-driver" value="D. Patel" />
-              </label>
-              <label>
-                <span>Vehicle / Medallion</span>
-                <input type="text" id="taxi-vehicle" value="Medallion 8H23" />
-              </label>
-              <label>
-                <span>Passenger note</span>
-                <input type="text" id="taxi-notes" value="Prepaid airport drop-off" />
-              </label>
+    <main>
+      <form class="workspace" id="receipt-form" autocomplete="off">
+        <section class="editor card" id="editor" aria-label="Receipt editor">
+          <section class="form-section">
+            <h2>Business details</h2>
+            <div class="fields">
+              <label>Business name<input id="store-name" type="text" value="Cornerstone Market" required /></label>
+              <label>Tagline<input id="store-tagline" type="text" value="Fresh Goods • Open Late" /></label>
+              <label>Address<input id="store-address" type="text" value="123 Harbor Ave, Springfield" /></label>
+              <label>Phone<input id="store-phone" type="tel" value="(555) 013-7788" /></label>
             </div>
-            <div class="field-grid">
-              <label>
-                <span>Pickup time</span>
-                <input type="datetime-local" id="taxi-pickup-time" />
-              </label>
-              <label>
-                <span>Drop-off time</span>
-                <input type="datetime-local" id="taxi-dropoff-time" />
-              </label>
+          </section>
+
+          <details class="form-section disclosure" id="transaction-details">
+            <summary>Transaction details <span class="summary-value" id="transaction-summary"></span></summary>
+            <div class="fields">
+              <label><span id="receipt-id-label">Receipt number</span><input id="receipt-id" type="text" value="A104829" /></label>
+              <label>Issue date &amp; time<input id="purchase-datetime" type="datetime-local" /></label>
+              <label data-template="retail">Register<input id="register-id" type="text" value="02" /></label>
+              <label data-template="retail">Cashier<input id="cashier-name" type="text" value="M. Harris" /></label>
             </div>
-          </fieldset>
+          </details>
 
-          <fieldset class="taxi-fieldset" data-template="taxi">
-            <legend>Taxi fare builder</legend>
-            <div class="field-grid">
-              <label>
-                <span>Base fare ($)</span>
-                <input type="number" id="taxi-base-fare" min="0" step="0.01" value="3.5" />
-              </label>
-              <label>
-                <span>Distance (mi)</span>
-                <input type="number" id="taxi-distance" min="0" step="0.01" value="8.2" />
-              </label>
-              <label>
-                <span>Rate per mile ($)</span>
-                <input type="number" id="taxi-rate" min="0" step="0.01" value="2.75" />
-              </label>
-              <label>
-                <span>Extras / fees ($)</span>
-                <input type="number" id="taxi-extras" min="0" step="0.01" value="1.5" />
-              </label>
-              <label>
-                <span>Tip ($)</span>
-                <input type="number" id="taxi-tip" min="0" step="0.01" value="4" />
-              </label>
+          <section class="form-section" data-template="retail">
+            <div class="section-heading"><h2>Line items</h2><button class="add-button" id="add-item" type="button"><span aria-hidden="true">+</span> Add item</button></div>
+            <div class="item-labels item-grid" aria-hidden="true"><span>Description</span><span>Qty</span><span>Unit price ($)</span></div>
+            <div id="items-container"></div>
+            <div class="fields adjustments">
+              <label>Tax rate (%)<input type="number" id="tax-rate" min="0" step="0.01" value="8.25" /></label>
+              <label>Discount after tax ($)<input type="number" id="discount-amount" min="0" step="0.01" value="0.00" /></label>
             </div>
-          </fieldset>
+          </section>
 
-          <fieldset class="items-fieldset" data-template="retail">
-            <legend>Line items</legend>
-            <div id="items-container" class="items-container"></div>
-            <button type="button" class="ghost" id="add-item">+ Add item</button>
-          </fieldset>
-
-          <div class="field-grid" data-template="retail">
-            <label>
-              <span>Tax rate (%)</span>
-              <input type="number" id="tax-rate" min="0" step="0.01" value="8.25" />
-            </label>
-            <label>
-              <span>Discount ($)</span>
-              <input type="number" id="discount-amount" min="0" step="0.01" value="0.00" />
-            </label>
-            <label>
-              <span>Payment method</span>
-              <input type="text" id="payment-method" value="VISA •••• 7742" />
-            </label>
-            <label>
-              <span>Footer note</span>
-              <input
-                type="text"
-                id="footer-message"
-                value="Keep this receipt for returns within 30 days."
-                placeholder="Add custom note"
-              />
-            </label>
-            <label>
-              <span>Closing line</span>
-              <input
-                type="text"
-                id="closing-message"
-                value="Thank you for shopping!"
-                placeholder="Add farewell"
-              />
-            </label>
-          </div>
-
-          <fieldset class="options">
-            <legend>Export options</legend>
-            <label class="checkbox">
-              <input type="checkbox" id="auto-download-png" checked />
-              <span>Download PNG after generate</span>
-            </label>
-            <label class="checkbox">
-              <input type="checkbox" id="auto-download-pdf" />
-              <span>Download PDF after generate</span>
-            </label>
-          </fieldset>
-
-          <fieldset class="options">
-            <legend>Footer display</legend>
-            <label class="checkbox">
-              <input type="checkbox" id="show-footer-message" />
-              <span>Show footer note</span>
-            </label>
-            <label class="checkbox">
-              <input type="checkbox" id="show-thankyou-line" />
-              <span>Show thank-you line</span>
-            </label>
-          </fieldset>
-
-          <fieldset class="options">
-            <legend>Server persistence</legend>
-            <label class="checkbox">
-              <input type="checkbox" id="enable-server-save" />
-              <span>Save a copy to server volume (when available)</span>
-            </label>
-            <p class="helptext" id="server-status">Checking backend...</p>
-          </fieldset>
-
-          <button type="submit" id="generate-btn">Generate receipt</button>
-        </form>
-      </section>
-
-      <section class="preview-panel">
-        <div class="preview-head">
-          <h2>Receipt preview</h2>
-          <p>Updates as you type</p>
-        </div>
-        <div id="receipt-preview">
-          <div id="receipt" class="receipt">
-            <header>
-              <div class="store-name" data-store-name>Cornerstone Market</div>
-              <div class="store-tagline" data-store-tagline>Fresh Goods • Open Late</div>
-              <div class="store-meta" data-store-meta>123 Harbor Ave, Springfield • (555) 013-7788</div>
-            </header>
-            <div class="divider dotted"></div>
-            <div class="meta">
-              <div>Receipt <span data-preview-receipt>A104829</span></div>
-              <div>Register <span data-preview-register>02</span></div>
-              <div>Cashier <span data-preview-cashier>M. Harris</span></div>
-              <div>Date <span data-preview-date></span></div>
+          <section class="form-section" data-template="taxi" hidden>
+            <h2>Ride details</h2>
+            <div class="fields">
+              <label>Pickup location<input type="text" id="taxi-pickup" value="241 Market St" /></label>
+              <label>Drop-off location<input type="text" id="taxi-dropoff" value="11 Cedar Ave" /></label>
+              <label>Pickup time<input type="datetime-local" id="taxi-pickup-time" /></label>
+              <label>Drop-off time<input type="datetime-local" id="taxi-dropoff-time" /></label>
+              <label>Driver<input type="text" id="taxi-driver" value="D. Patel" /></label>
+              <label>Vehicle / medallion<input type="text" id="taxi-vehicle" value="Medallion 8H23" /></label>
+              <label>Passenger<input type="text" id="taxi-passenger" value="Jordan Miles" /></label>
+              <label>Ride note<input type="text" id="taxi-notes" value="Prepaid airport drop-off" /></label>
             </div>
-            <div class="divider dashed" data-template="taxi"></div>
-            <div class="ride-details" data-template="taxi">
-              <div><span>Passenger</span><span data-preview-passenger>Jordan Miles</span></div>
-              <div><span>Route</span><span data-preview-route>241 Market St → 11 Cedar Ave</span></div>
-              <div><span>Pickup</span><span data-preview-pickup></span></div>
-              <div><span>Drop-off</span><span data-preview-dropoff></span></div>
-              <div><span>Driver</span><span data-preview-driver>D. Patel</span></div>
-              <div><span>Vehicle</span><span data-preview-vehicle>Medallion 8H23</span></div>
+          </section>
+
+          <section class="form-section" data-template="taxi" hidden>
+            <h2>Fare breakdown</h2>
+            <div class="fields">
+              <label>Base fare ($)<input type="number" id="taxi-base-fare" min="0" step="0.01" value="3.50" /></label>
+              <label>Distance (mi)<input type="number" id="taxi-distance" min="0" step="0.01" value="8.20" /></label>
+              <label>Rate per mile ($)<input type="number" id="taxi-rate" min="0" step="0.01" value="2.75" /></label>
+              <label>Extras / fees ($)<input type="number" id="taxi-extras" min="0" step="0.01" value="1.50" /></label>
+              <label>Tip ($)<input type="number" id="taxi-tip" min="0" step="0.01" value="4.00" /></label>
             </div>
-            <div class="ride-fares" data-template="taxi">
+          </section>
+
+          <section class="form-section">
+            <h2>Payment</h2>
+            <label>Payment method<input type="text" id="payment-method" value="VISA •••• 7742" /></label>
+          </section>
+          <details class="form-section disclosure">
+            <summary>Footer options</summary>
+            <div class="footer-fields">
               <div>
-                <span>Base fare</span>
-                <span data-preview-basefare>$0.00</span>
+                <label class="check"><input type="checkbox" id="show-footer-message" /> Show footer note</label>
+                <label class="conditional" id="footer-setting" hidden><span class="sr-only">Footer note</span><input type="text" id="footer-message" value="Keep this receipt for returns within 30 days." /></label>
               </div>
               <div>
-                <span>Distance</span>
-                <span data-preview-distance-charge>$0.00</span>
-              </div>
-              <div class="fine-print" data-preview-distance-meta>—</div>
-              <div>
-                <span>Extras / fees</span>
-                <span data-preview-extras>$0.00</span>
-              </div>
-              <div>
-                <span>Ride subtotal</span>
-                <span data-preview-taxi-subtotal>$0.00</span>
+                <label class="check"><input type="checkbox" id="show-thankyou-line" /> Show closing line</label>
+                <label class="conditional" id="closing-setting" hidden><span class="sr-only">Closing line</span><input type="text" id="closing-message" value="Thank you for shopping!" /></label>
               </div>
             </div>
-            <div class="divider dashed"></div>
-            <div class="items-list" data-template="retail">
-              <div class="items-header">
-                <span class="item-desc">Item</span>
-                <span class="item-qty">Qty</span>
-                <span class="item-price">Price</span>
-              </div>
-              <div id="preview-items"></div>
-            </div>
-            <div class="divider dotted" data-template="retail"></div>
-            <div class="totals">
-              <div data-template="retail">
-                <span>Subtotal</span>
-                <span data-preview-subtotal>$0.00</span>
-              </div>
-              <div data-template="retail">
-                <span>Tax</span>
-                <span data-preview-tax>$0.00</span>
-              </div>
-              <div data-template="retail">
-                <span>Discount</span>
-                <span data-preview-discount>$0.00</span>
-              </div>
-              <div data-template="taxi">
-                <span>Tip</span>
-                <span data-preview-tip>$0.00</span>
-              </div>
-              <div class="grand">
-                <span>Total</span>
-                <span data-preview-total>$0.00</span>
-              </div>
-              <div data-template="retail">
-                <span>Payment</span>
-                <span data-preview-payment>VISA •••• 7742</span>
-              </div>
-              <div data-template="taxi">
-                <span>Payment</span>
-                <span data-preview-payment>VISA •••• 7742</span>
-              </div>
-            </div>
-            <div class="divider dashed"></div>
-            <footer>
-              <p data-template="taxi" class="ride-note" data-preview-ride-note>Prepaid airport drop-off</p>
-              <p data-preview-footer hidden>Keep this receipt for returns within 30 days.</p>
-              <p class="barcode">||||| || ||| |||||| ||| |</p>
-              <p class="thanks" data-preview-thanks hidden>Thank you for shopping!</p>
-            </footer>
+          </details>
+        </section>
+
+        <section class="preview card" id="preview" aria-labelledby="preview-title" tabindex="-1">
+          <div class="preview-heading">
+            <h2 id="preview-title">Receipt preview</h2>
+            <span class="paper-size">80 mm paper</span>
           </div>
-        </div>
-        <div class="output-panel" id="output-panel" hidden>
-          <p id="save-status"></p>
-          <div class="output-actions">
-            <button type="button" id="download-png-btn" class="secondary">Download PNG again</button>
-            <button type="button" id="download-pdf-btn" class="secondary">Download PDF again</button>
+          <div class="paper-tray" id="receipt-preview" role="region" aria-label="Receipt paper" tabindex="0">
+            <div class="paper-shadow">
+              <article id="receipt" class="receipt" aria-label="Receipt">
+                <header class="receipt-heading">
+                  <div class="store-name" data-store-name></div>
+                  <div class="store-tagline" data-store-tagline></div>
+                  <div data-store-address></div>
+                  <div data-store-phone></div>
+                </header>
+                <dl class="paper-block">
+                  <div><dt id="paper-id-label">Receipt #</dt><dd data-preview-receipt></dd></div>
+                  <div><dt>Issued</dt><dd data-preview-date></dd></div>
+                  <div data-template="retail"><dt>Register</dt><dd data-preview-register></dd></div>
+                  <div data-template="retail"><dt>Cashier</dt><dd data-preview-cashier></dd></div>
+                </dl>
+                <dl class="paper-block" data-template="taxi" hidden>
+                  <div><dt>Passenger</dt><dd data-preview-passenger></dd></div>
+                  <div><dt>Route</dt><dd data-preview-route></dd></div>
+                  <div><dt>Pickup</dt><dd data-preview-pickup></dd></div>
+                  <div><dt>Drop-off</dt><dd data-preview-dropoff></dd></div>
+                  <div><dt>Driver</dt><dd data-preview-driver></dd></div>
+                  <div><dt>Vehicle</dt><dd data-preview-vehicle></dd></div>
+                </dl>
+                <dl class="paper-block" data-template="taxi" hidden>
+                  <div><dt>Base fare</dt><dd data-preview-basefare></dd></div>
+                  <div><dt>Distance fare</dt><dd data-preview-distance-charge></dd></div>
+                  <div class="rate-note"><dt class="sr-only">Distance rate</dt><dd data-preview-distance-meta></dd></div>
+                  <div><dt>Extras / fees</dt><dd data-preview-extras></dd></div>
+                </dl>
+                <div class="paper-block" data-template="retail">
+                  <div class="paper-row paper-labels"><span>Item</span><span>Qty</span><span>Amount</span></div>
+                  <div id="preview-items"></div>
+                </div>
+                <dl class="paper-block">
+                  <div data-template="retail"><dt>Subtotal</dt><dd data-preview-subtotal></dd></div>
+                  <div data-template="retail"><dt data-tax-label>Tax</dt><dd data-preview-tax></dd></div>
+                  <div data-template="retail"><dt>Discount</dt><dd data-preview-discount></dd></div>
+                  <div data-template="taxi" hidden><dt>Ride subtotal</dt><dd data-preview-taxi-subtotal></dd></div>
+                  <div data-template="taxi" hidden><dt>Tip</dt><dd data-preview-tip></dd></div>
+                  <div class="grand"><dt>Total</dt><dd data-preview-total></dd></div>
+                  <div class="payment-row"><dt>Payment</dt><dd data-preview-payment></dd></div>
+                </dl>
+                <footer class="paper-footer">
+                  <p data-preview-ride-note data-template="taxi" hidden></p>
+                  <p data-preview-footer hidden></p>
+                  <p class="thanks" data-preview-thanks hidden></p>
+                  <div class="barcode" aria-hidden="true"></div>
+                </footer>
+              </article>
+            </div>
           </div>
-        </div>
-      </section>
+          <div class="export-panel">
+            <div class="export-row">
+              <fieldset class="format-picker">
+                <legend>Download as</legend>
+                <label class="check"><input type="checkbox" id="auto-download-png" checked /> PNG</label>
+                <label class="check"><input type="checkbox" id="auto-download-pdf" /> PDF</label>
+              </fieldset>
+              <button class="primary" type="submit" id="generate-btn">Export receipt</button>
+            </div>
+            <label class="check server-option" id="server-option" hidden><input type="checkbox" id="enable-server-save" disabled /> Save a copy on the server</label>
+            <div id="output-panel" hidden>
+              <p id="save-status" role="status"></p>
+              <div id="repeat-downloads" hidden>
+                <button class="text-button" type="submit" name="format" value="png">Download PNG</button>
+                <button class="text-button" type="submit" name="format" value="pdf">Download PDF</button>
+              </div>
+            </div>
+          </div>
+          <a class="mobile-link back-link" href="#editor">Back to editor</a>
+        </section>
+      </form>
     </main>
-
+    <template id="item-template">
+      <div class="item-row item-grid">
+        <input type="text" placeholder="Item description" data-field="description" />
+        <input type="number" min="1" step="1" data-field="qty" />
+        <input type="number" min="0" step="0.01" data-field="price" />
+        <button type="button" class="remove-item"><span aria-hidden="true">×</span></button>
+      </div>
+    </template>
     <script src="vendor/html2canvas.min.js"></script>
     <script src="vendor/jspdf.umd.min.js"></script>
     <script type="module" src="app.js"></script>

@@ -1,111 +1,53 @@
-const html2canvas = window.html2canvas;
-const { jsPDF } = window.jspdf;
+const byId = (id) => document.getElementById(id);
+const textValue = (id) => byId(id).value.trim();
+const numberValue = (id) => byId(id).valueAsNumber || 0;
 
-const dom = {
-  form: document.getElementById('receipt-form'),
-  itemsContainer: document.getElementById('items-container'),
-  addItem: document.getElementById('add-item'),
-  purchaseDate: document.getElementById('purchase-datetime'),
-  receiptType: document.getElementById('receipt-type'),
-  receipt: document.getElementById('receipt'),
-  previewItems: document.getElementById('preview-items'),
-  autoPng: document.getElementById('auto-download-png'),
-  autoPdf: document.getElementById('auto-download-pdf'),
-  showFooter: document.getElementById('show-footer-message'),
-  showThanks: document.getElementById('show-thankyou-line'),
-  enableServerSave: document.getElementById('enable-server-save'),
-  serverStatus: document.getElementById('server-status'),
-  generateBtn: document.getElementById('generate-btn'),
-  outputPanel: document.getElementById('output-panel'),
-  saveStatus: document.getElementById('save-status'),
-  downloadPngBtn: document.getElementById('download-png-btn'),
-  downloadPdfBtn: document.getElementById('download-pdf-btn'),
-};
-
-const previewFields = {
-  storeName: document.querySelector('[data-store-name]'),
-  tagline: document.querySelector('[data-store-tagline]'),
-  meta: document.querySelector('[data-store-meta]'),
-  receipt: document.querySelector('[data-preview-receipt]'),
-  register: document.querySelector('[data-preview-register]'),
-  cashier: document.querySelector('[data-preview-cashier]'),
-  date: document.querySelector('[data-preview-date]'),
-  subtotal: document.querySelector('[data-preview-subtotal]'),
-  tax: document.querySelector('[data-preview-tax]'),
-  discount: document.querySelector('[data-preview-discount]'),
-  total: document.querySelector('[data-preview-total]'),
-  payment: document.querySelector('[data-preview-payment]'),
-  ridePassenger: document.querySelector('[data-preview-passenger]'),
-  rideRoute: document.querySelector('[data-preview-route]'),
-  ridePickup: document.querySelector('[data-preview-pickup]'),
-  rideDropoff: document.querySelector('[data-preview-dropoff]'),
-  rideDriver: document.querySelector('[data-preview-driver]'),
-  rideVehicle: document.querySelector('[data-preview-vehicle]'),
-  rideBasefare: document.querySelector('[data-preview-basefare]'),
-  rideDistanceCharge: document.querySelector('[data-preview-distance-charge]'),
-  rideDistanceMeta: document.querySelector('[data-preview-distance-meta]'),
-  rideExtras: document.querySelector('[data-preview-extras]'),
-  rideSubtotal: document.querySelector('[data-preview-taxi-subtotal]'),
-  tip: document.querySelector('[data-preview-tip]'),
-  rideNote: document.querySelector('[data-preview-ride-note]'),
-  thanks: document.querySelector('[data-preview-thanks]'),
-  footer: document.querySelector('[data-preview-footer]'),
-};
-
+const form = byId('receipt-form');
+const receipt = byId('receipt');
+const itemsContainer = byId('items-container');
+const itemTemplate = byId('item-template');
 const templateSections = document.querySelectorAll('[data-template]');
-let activeTemplate = null;
+const formatButtons = form.querySelectorAll('button[type="submit"]');
+const paperField = (attribute) => receipt.querySelector('[data-' + attribute + ']');
+const preview = {
+  passenger: paperField('preview-passenger'),
+  route: paperField('preview-route'),
+  pickup: paperField('preview-pickup'),
+  dropoff: paperField('preview-dropoff'),
+  driver: paperField('preview-driver'),
+  vehicle: paperField('preview-vehicle'),
+  basefare: paperField('preview-basefare'),
+  distanceCharge: paperField('preview-distance-charge'),
+  distanceMeta: paperField('preview-distance-meta'),
+  extras: paperField('preview-extras'),
+  taxiSubtotal: paperField('preview-taxi-subtotal'),
+  tip: paperField('preview-tip'),
+  total: paperField('preview-total'),
+  rideNote: paperField('preview-ride-note'),
+  storeName: paperField('store-name'),
+  storeTagline: paperField('store-tagline'),
+  storeAddress: paperField('store-address'),
+  storePhone: paperField('store-phone'),
+  receipt: paperField('preview-receipt'),
+  register: paperField('preview-register'),
+  cashier: paperField('preview-cashier'),
+  date: paperField('preview-date'),
+  payment: paperField('preview-payment'),
+  footer: paperField('preview-footer'),
+  thanks: paperField('preview-thanks'),
+  subtotal: paperField('preview-subtotal'),
+  taxLabel: paperField('tax-label'),
+  tax: paperField('preview-tax'),
+  discount: paperField('preview-discount'),
+};
 
-const currencyFormatter = new Intl.NumberFormat(undefined, {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-});
-
+const currencyFormatter = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
-  year: 'numeric',
-  month: 'short',
-  day: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
+  year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
 });
-
-const getInputValue = (id) => {
-  const el = document.getElementById(id);
-  return el ? el.value.trim() : '';
-};
-
-const getNumberValue = (id) => {
-  const el = document.getElementById(id);
-  if (!el) return 0;
-  const parsed = parseFloat(el.value);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const formatRoute = (pickup, dropoff) => {
-  if (pickup && dropoff) {
-    return `${pickup} → ${dropoff}`;
-  }
-  return pickup || dropoff || 'Route pending';
-};
-
-const setActiveTemplate = (template) => {
-  if (activeTemplate === template) {
-    return;
-  }
-  activeTemplate = template;
-  templateSections.forEach((element) => {
-    const targets = element.dataset.template
-      .split(',')
-      .map((entry) => entry.trim());
-    element.hidden = !targets.includes(template);
-  });
-  dom.receipt.classList.toggle('receipt--taxi', template === 'taxi');
-};
-let lastImageDataUrl = null;
-let lastCanvasDimensions = { width: 0, height: 0 };
-let lastFileBase = 'receipt';
-let isGenerating = false;
-let serverAvailable = false;
+const currency = (value) => currencyFormatter.format(value);
+const hundredths = (value) => Math.round(value * 100);
+const lineAmount = (item) => item.qty * hundredths(item.price) / 100;
 
 const defaultItems = [
   { description: 'Cold Brew', qty: 1, price: 4.5 },
@@ -113,47 +55,19 @@ const defaultItems = [
   { description: 'Granola Bar', qty: 1, price: 1.75 },
 ];
 
-const setTaxiDefaults = () => {
-  const pickupInput = document.getElementById('taxi-pickup-time');
-  const dropoffInput = document.getElementById('taxi-dropoff-time');
-  const now = new Date();
-  if (pickupInput && !pickupInput.value) {
-    pickupInput.value = toInputDateTime(now);
-  }
-  if (dropoffInput && !dropoffInput.value) {
-    const later = new Date(now.getTime() + 20 * 60 * 1000);
-    dropoffInput.value = toInputDateTime(later);
-  }
+// Swap example text with the template. Keep anything the user has customized.
+const taxiExamples = {
+  'store-name': 'Harbor City Taxi',
+  'store-tagline': 'City cab service',
+  'store-address': '18 Station Road, Springfield',
+  'store-phone': '(555) 013-4200',
+  'receipt-id': 'T104829',
+  'footer-message': 'Please keep this receipt for your records.',
+  'closing-message': 'Thank you for riding with us!',
 };
 
-const getTaxiRideData = () => ({
-  passenger: getInputValue('taxi-passenger'),
-  pickupLocation: getInputValue('taxi-pickup'),
-  dropoffLocation: getInputValue('taxi-dropoff'),
-  pickupTime: document.getElementById('taxi-pickup-time')?.value || '',
-  dropoffTime: document.getElementById('taxi-dropoff-time')?.value || '',
-  driver: getInputValue('taxi-driver'),
-  vehicle: getInputValue('taxi-vehicle'),
-  note: getInputValue('taxi-notes'),
-});
-
-const getTaxiCharges = () => ({
-  baseFare: getNumberValue('taxi-base-fare'),
-  distanceMiles: getNumberValue('taxi-distance'),
-  ratePerMile: getNumberValue('taxi-rate'),
-  extras: getNumberValue('taxi-extras'),
-  tip: getNumberValue('taxi-tip'),
-});
-
-const slugify = (value = '') =>
-  value
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-const currency = (value) => currencyFormatter.format(value || 0);
+let activeTemplate = 'retail';
+let isGenerating = false;
 
 const toInputDateTime = (date = new Date()) => {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -161,390 +75,376 @@ const toInputDateTime = (date = new Date()) => {
 };
 
 const readableDate = (value) => {
-  if (!value) return dateFormatter.format(new Date());
+  if (!value) return '—';
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return dateFormatter.format(new Date());
-  return dateFormatter.format(parsed);
+  return Number.isNaN(parsed.getTime()) ? '—' : dateFormatter.format(parsed);
 };
 
-const addItemRow = (item = {}) => {
-  const row = document.createElement('div');
-  row.className = 'item-row';
-  row.innerHTML = `
-    <input type="text" placeholder="Description" value="${item.description || ''}" data-field="description" />
-    <input type="number" min="1" step="1" value="${item.qty ?? 1}" data-field="qty" />
-    <input type="number" min="0" step="0.01" value="${item.price ?? 0}" data-field="price" />
-    <button type="button" title="Remove item">&times;</button>
-  `;
-
-  row.querySelectorAll('input').forEach((el) => el.addEventListener('input', renderPreview));
-  row.querySelector('button').addEventListener('click', () => {
-    row.remove();
-    renderPreview();
+const setActiveTemplate = () => {
+  const next = document.querySelector('input[name="receipt-type"]:checked').value;
+  if (next !== activeTemplate) {
+    for (const [id, taxiExample] of Object.entries(taxiExamples)) {
+      const input = byId(id);
+      const previousExample = activeTemplate === 'taxi' ? taxiExample : input.defaultValue;
+      if (input.value === previousExample) {
+        input.value = next === 'taxi' ? taxiExample : input.defaultValue;
+      }
+    }
+  }
+  activeTemplate = next;
+  templateSections.forEach((section) => {
+    const inactive = section.dataset.template !== next;
+    section.hidden = inactive;
+    section.querySelectorAll('input, button').forEach((control) => { control.disabled = inactive; });
   });
-
-  dom.itemsContainer.appendChild(row);
+  byId('receipt-id-label').textContent = next === 'taxi' ? 'Trip ID' : 'Receipt number';
+  byId('paper-id-label').textContent = next === 'taxi' ? 'Trip ID' : 'Receipt #';
 };
 
-const collectItems = () =>
-  Array.from(dom.itemsContainer.querySelectorAll('.item-row'))
-    .map((row) => {
-      const description = row.querySelector('[data-field="description"]').value.trim();
-      const qty = parseFloat(row.querySelector('[data-field="qty"]').value) || 0;
-      const price = parseFloat(row.querySelector('[data-field="price"]').value) || 0;
-      return { description, qty, price };
-    })
-    .filter((item) => item.description || item.price > 0);
-
-const getFormData = () => {
-  const items = collectItems();
-  const type = dom.receiptType.value;
-  return {
-    type,
-    storeName: document.getElementById('store-name').value.trim() || 'Store',
-    tagline: document.getElementById('store-tagline').value.trim(),
-    address: document.getElementById('store-address').value.trim(),
-    phone: document.getElementById('store-phone').value.trim(),
-    receiptId: document.getElementById('receipt-id').value.trim(),
-    register: document.getElementById('register-id').value.trim(),
-    cashier: document.getElementById('cashier-name').value.trim(),
-    datetime: document.getElementById('purchase-datetime').value || new Date().toISOString(),
-    taxRate: parseFloat(document.getElementById('tax-rate').value) || 0,
-    discount: parseFloat(document.getElementById('discount-amount').value) || 0,
-    paymentMethod: document.getElementById('payment-method').value.trim(),
-    footerMessage: document.getElementById('footer-message').value.trim(),
-    closingMessage: document.getElementById('closing-message').value.trim(),
-    showFooter: !!dom.showFooter?.checked,
-    showClosing: !!dom.showThanks?.checked,
-    taxiRide: getTaxiRideData(),
-    taxiCharges: getTaxiCharges(),
-    items,
-  };
+const labelItemRows = () => {
+  Array.from(itemsContainer.children).forEach((row, index) => {
+    const number = index + 1;
+    row.querySelector('[data-field="description"]').setAttribute('aria-label', 'Item ' + number + ' description');
+    row.querySelector('[data-field="qty"]').setAttribute('aria-label', 'Item ' + number + ' quantity');
+    row.querySelector('[data-field="price"]').setAttribute('aria-label', 'Item ' + number + ' unit price in dollars');
+    const remove = row.querySelector('button');
+    remove.setAttribute('aria-label', 'Remove item ' + number);
+    remove.title = 'Remove item ' + number;
+  });
 };
+
+const addItemRow = ({ description = '', qty = 1, price = 0 } = {}) => {
+  const row = itemTemplate.content.firstElementChild.cloneNode(true);
+  row.querySelector('[data-field="description"]').value = description;
+  row.querySelector('[data-field="qty"]').value = qty;
+  row.querySelector('[data-field="price"]').value = price.toFixed(2);
+  row.querySelector('button').addEventListener('click', () => {
+    const neighbor = row.nextElementSibling || row.previousElementSibling;
+    row.remove();
+    labelItemRows();
+    renderPreview();
+    (neighbor?.querySelector('button') || byId('add-item')).focus();
+  });
+  itemsContainer.appendChild(row);
+  labelItemRows();
+  return row;
+};
+
+const collectItems = () => {
+  const items = [];
+  for (const row of itemsContainer.children) {
+    const description = row.querySelector('[data-field="description"]').value.trim();
+    const qty = row.querySelector('[data-field="qty"]');
+    const price = row.querySelector('[data-field="price"]');
+    const used = Boolean(description) || price.valueAsNumber > 0;
+    qty.required = used;
+    price.required = used;
+    if (used) items.push({ description, qty: qty.valueAsNumber || 0, price: price.valueAsNumber || 0 });
+  }
+  return items;
+};
+
+const getFormData = () => ({
+  type: activeTemplate,
+  storeName: textValue('store-name'),
+  tagline: textValue('store-tagline'),
+  address: textValue('store-address'),
+  phone: textValue('store-phone'),
+  receiptId: textValue('receipt-id'),
+  register: textValue('register-id'),
+  cashier: textValue('cashier-name'),
+  datetime: textValue('purchase-datetime'),
+  taxRate: numberValue('tax-rate'),
+  discount: numberValue('discount-amount'),
+  paymentMethod: textValue('payment-method'),
+  footerMessage: textValue('footer-message'),
+  closingMessage: textValue('closing-message'),
+  showFooter: byId('show-footer-message').checked,
+  showClosing: byId('show-thankyou-line').checked,
+  taxiRide: {
+    passenger: textValue('taxi-passenger'),
+    pickupLocation: textValue('taxi-pickup'),
+    dropoffLocation: textValue('taxi-dropoff'),
+    pickupTime: textValue('taxi-pickup-time'),
+    dropoffTime: textValue('taxi-dropoff-time'),
+    driver: textValue('taxi-driver'),
+    vehicle: textValue('taxi-vehicle'),
+    note: textValue('taxi-notes'),
+  },
+  taxiCharges: {
+    baseFare: numberValue('taxi-base-fare'),
+    distanceMiles: numberValue('taxi-distance'),
+    ratePerMile: numberValue('taxi-rate'),
+    extras: numberValue('taxi-extras'),
+    tip: numberValue('taxi-tip'),
+  },
+  items: collectItems(),
+});
 
 const computeRetailTotals = (items, taxRate, discount) => {
-  const subtotal = items.reduce((sum, item) => sum + item.qty * item.price, 0);
-  const tax = subtotal * (taxRate / 100);
-  const safeDiscount = Math.min(discount, subtotal + tax);
-  const total = subtotal + tax - safeDiscount;
-  return { subtotal, tax, discount: safeDiscount, total };
+  const subtotal = items.reduce((sum, item) => sum + item.qty * hundredths(item.price), 0);
+  // Round tax once to the cent, then apply the after-tax discount shown in the editor.
+  const tax = Math.round(subtotal * hundredths(taxRate) / 10000);
+  const appliedDiscount = Math.min(hundredths(discount), subtotal + tax);
+  return {
+    subtotal: subtotal / 100,
+    tax: tax / 100,
+    discount: appliedDiscount / 100,
+    total: (subtotal + tax - appliedDiscount) / 100,
+  };
 };
 
 const computeTaxiTotals = (charges) => {
-  const distanceCharge = charges.distanceMiles * charges.ratePerMile;
-  const subtotal = charges.baseFare + distanceCharge + charges.extras;
-  const total = subtotal + charges.tip;
+  const distanceCharge = Math.round(hundredths(charges.distanceMiles) * hundredths(charges.ratePerMile) / 100);
+  const subtotal = hundredths(charges.baseFare) + distanceCharge + hundredths(charges.extras);
   return {
-    distanceCharge,
-    subtotal,
-    total,
+    distanceCharge: distanceCharge / 100,
+    subtotal: subtotal / 100,
+    total: (subtotal + hundredths(charges.tip)) / 100,
   };
 };
 
-const hasTaxiCharges = (charges) => {
-  if (!charges) return false;
-  if (charges.baseFare > 0) return true;
-  if (charges.extras > 0) return true;
-  if (charges.tip > 0) return true;
-  if (charges.distanceMiles > 0 && charges.ratePerMile >= 0) return true;
-  return false;
+const renderItemsPreview = (items) => {
+  const list = byId('preview-items');
+  list.replaceChildren();
+  if (!items.length) {
+    const message = document.createElement('p');
+    message.className = 'empty-items';
+    message.textContent = 'Add a line item to begin.';
+    list.append(message);
+  }
+  for (const item of items) {
+    const row = document.createElement('div');
+    row.className = 'paper-row';
+    for (const value of [item.description || 'Item', item.qty, currency(lineAmount(item))]) {
+      const cell = document.createElement('span');
+      cell.textContent = value;
+      row.append(cell);
+    }
+    list.append(row);
+  }
 };
 
-const renderItemsPreview = (items) => {
-  dom.previewItems.innerHTML = '';
-  if (!items.length) {
-    const placeholder = document.createElement('div');
-    placeholder.textContent = 'Add items to build your receipt';
-    placeholder.style.opacity = '0.6';
-    dom.previewItems.appendChild(placeholder);
-    return;
-  }
-
-  items.forEach((item) => {
-    const row = document.createElement('div');
-    row.innerHTML = `
-      <span>${item.description || 'Item'}</span>
-      <span>${item.qty.toFixed(0)}</span>
-      <span>${currency(item.qty * item.price)}</span>
-    `;
-    dom.previewItems.appendChild(row);
-  });
+const renderTaxiPreview = (data) => {
+  const { taxiRide: ride, taxiCharges: charges } = data;
+  const totals = computeTaxiTotals(charges);
+  preview.passenger.textContent = ride.passenger || '—';
+  preview.route.textContent = [ride.pickupLocation, ride.dropoffLocation].filter(Boolean).join(' → ') || '—';
+  preview.pickup.textContent = readableDate(ride.pickupTime);
+  preview.dropoff.textContent = readableDate(ride.dropoffTime);
+  preview.driver.textContent = ride.driver || '—';
+  preview.vehicle.textContent = ride.vehicle || '—';
+  preview.basefare.textContent = currency(charges.baseFare);
+  preview.distanceCharge.textContent = currency(totals.distanceCharge);
+  preview.distanceMeta.textContent = charges.distanceMiles + ' mi × ' + currency(charges.ratePerMile) + '/mi';
+  preview.extras.textContent = currency(charges.extras);
+  preview.taxiSubtotal.textContent = currency(totals.subtotal);
+  preview.tip.textContent = currency(charges.tip);
+  preview.total.textContent = currency(totals.total);
+  preview.rideNote.textContent = ride.note;
+  preview.rideNote.hidden = !ride.note;
+  byId('taxi-dropoff-time').min = ride.pickupTime;
 };
 
 const renderPreview = () => {
   const data = getFormData();
-  const isTaxi = data.type === 'taxi';
-  setActiveTemplate(isTaxi ? 'taxi' : 'retail');
+  byId('store-name').setCustomValidity(data.storeName ? '' : 'Enter a business name.');
+  preview.storeName.textContent = data.storeName || (data.type === 'taxi' ? 'Taxi service' : 'Store');
+  preview.storeTagline.textContent = data.tagline;
+  preview.storeAddress.textContent = data.address;
+  preview.storePhone.textContent = data.phone;
+  preview.receipt.textContent = data.receiptId || '—';
+  preview.register.textContent = data.register || '—';
+  preview.cashier.textContent = data.cashier || '—';
+  preview.date.textContent = readableDate(data.datetime);
+  preview.payment.textContent = data.paymentMethod;
+  preview.payment.parentElement.hidden = !data.paymentMethod;
+  byId('transaction-summary').textContent = data.receiptId;
+  byId('footer-setting').hidden = !data.showFooter;
+  byId('closing-setting').hidden = !data.showClosing;
+  preview.footer.textContent = data.footerMessage;
+  preview.footer.hidden = !(data.showFooter && data.footerMessage);
+  preview.thanks.textContent = data.closingMessage;
+  preview.thanks.hidden = !(data.showClosing && data.closingMessage);
 
-  previewFields.storeName.textContent =
-    data.storeName || (isTaxi ? 'City Taxi Service' : 'Store');
-  previewFields.tagline.textContent =
-    data.tagline || (isTaxi ? 'Licensed & Insured Rides' : '—');
-  previewFields.meta.textContent = [data.address, data.phone].filter(Boolean).join(' • ') || '';
-  previewFields.receipt.textContent = data.receiptId || '—';
-  previewFields.register.textContent = data.register || '—';
-  previewFields.cashier.textContent = data.cashier || '—';
-  const primaryDate =
-    isTaxi && data.taxiRide.pickupTime ? data.taxiRide.pickupTime : data.datetime;
-  previewFields.date.textContent = readableDate(primaryDate);
-  previewFields.payment.textContent = data.paymentMethod || '';
-  const shouldShowFooter = data.showFooter && data.footerMessage;
-  previewFields.footer.textContent = data.footerMessage || '';
-  previewFields.footer.hidden = !shouldShowFooter;
-
-  const closingFallback = isTaxi ? 'Thank you for riding with us!' : 'Thank you for shopping!';
-  const closingText = data.closingMessage || closingFallback;
-  if (previewFields.thanks) {
-    previewFields.thanks.textContent = closingText;
-    previewFields.thanks.hidden = !data.showClosing;
-  }
-
-  if (isTaxi) {
-    const totals = computeTaxiTotals(data.taxiCharges);
-    renderTaxiPreview(data, totals);
+  if (data.type === 'taxi') {
+    renderTaxiPreview(data);
   } else {
     const totals = computeRetailTotals(data.items, data.taxRate, data.discount);
-    previewFields.subtotal.textContent = currency(totals.subtotal);
-    previewFields.tax.textContent = `${currency(totals.tax)} (${(data.taxRate || 0).toFixed(
-      2
-    )}%)`;
-    previewFields.discount.textContent = currency(totals.discount);
-    previewFields.total.textContent = currency(totals.total);
+    preview.subtotal.textContent = currency(totals.subtotal);
+    preview.taxLabel.textContent = 'Tax (' + data.taxRate + '%)';
+    preview.tax.textContent = currency(totals.tax);
+    preview.discount.textContent = currency(-totals.discount);
+    preview.discount.parentElement.hidden = totals.discount === 0;
+    preview.total.textContent = currency(totals.total);
     renderItemsPreview(data.items);
   }
 };
 
-const renderTaxiPreview = (data, totals) => {
-  const ride = data.taxiRide;
-  const charges = data.taxiCharges;
+const slugify = (value) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
-  previewFields.ridePassenger.textContent = ride.passenger || 'Walk-up passenger';
-  previewFields.rideRoute.textContent = formatRoute(ride.pickupLocation, ride.dropoffLocation);
-  previewFields.ridePickup.textContent = ride.pickupTime ? readableDate(ride.pickupTime) : '—';
-  previewFields.rideDropoff.textContent = ride.dropoffTime ? readableDate(ride.dropoffTime) : '—';
-  previewFields.rideDriver.textContent = ride.driver || data.cashier || '—';
-  previewFields.rideVehicle.textContent = ride.vehicle || data.register || '—';
-  previewFields.rideBasefare.textContent = currency(charges.baseFare);
-  previewFields.rideDistanceCharge.textContent = currency(totals.distanceCharge);
-  previewFields.rideDistanceMeta.textContent =
-    charges.distanceMiles > 0 && charges.ratePerMile > 0
-      ? `${charges.distanceMiles.toFixed(2)} mi @ ${currency(charges.ratePerMile)}/mi`
-      : '—';
-  previewFields.rideExtras.textContent = currency(charges.extras);
-  previewFields.rideSubtotal.textContent = currency(totals.subtotal);
-  previewFields.tip.textContent = currency(charges.tip);
-  previewFields.total.textContent = currency(totals.total);
+const buildFileBase = (data) => {
+  const prefix = [data.storeName, data.receiptId].map(slugify).filter(Boolean).join('-') || 'receipt';
+  const stamp = (data.datetime || toInputDateTime()).slice(0, 10);
+  return prefix + '-' + stamp;
+};
 
-  if (previewFields.rideNote) {
-    previewFields.rideNote.textContent = ride.note;
-    previewFields.rideNote.hidden = !ride.note;
-  }
+const captureReceipt = () => {
+  const paperWidth = receipt.getBoundingClientRect().width;
+  return window.html2canvas(receipt, {
+    scale: 2,
+    backgroundColor: '#ffffff',
+    logging: false,
+    onclone: (doc, paper) => {
+      // Capture the entire paper even when its preview is scrolled or clipped.
+      doc.body.appendChild(paper);
+      Object.assign(paper.style, { position: 'absolute', top: '0', left: '0', width: paperWidth + 'px' });
+    },
+  });
 };
 
 const downloadPng = (dataUrl, fileBase) => {
   const link = document.createElement('a');
   link.href = dataUrl;
-  link.download = `${fileBase}.png`;
+  link.download = fileBase + '.png';
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
+  link.remove();
 };
 
-const downloadPdf = (dataUrl, fileBase, width, height) => {
-  if (!width || !height) return;
-  const orientation = height >= width ? 'portrait' : 'landscape';
-  const pdf = new jsPDF({
-    orientation,
-    unit: 'px',
-    format: [width, height],
-  });
-  pdf.addImage(dataUrl, 'PNG', 0, 0, width, height);
-  pdf.save(`${fileBase}.pdf`);
+const downloadPdf = (dataUrl, fileBase, canvas) => {
+  const width = 80;
+  const height = width * canvas.height / canvas.width;
+  // jsPDF supports up to 14,400 points per page. Split only unusually long rolls.
+  const pageLimit = 5080;
+  const pageSize = (offset) => [width, Math.min(pageLimit, height - offset)];
+  const orientation = (size) => size[1] >= size[0] ? 'portrait' : 'landscape';
+  const first = pageSize(0);
+  const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: first, orientation: orientation(first), compress: true });
+  for (let offset = 0; offset < height; offset += pageLimit) {
+    if (offset) {
+      const size = pageSize(offset);
+      pdf.addPage(size, orientation(size));
+    }
+    pdf.addImage(dataUrl, 'PNG', 0, -offset, width, height, 'receipt', 'FAST');
+  }
+  pdf.save(fileBase + '.pdf');
 };
 
-const persistReceipt = async (imageData, fileBase, meta) => {
-  const payload = {
-    imageData,
-    fileName: fileBase,
-    meta: {
-      storeName: meta.storeName,
-      receiptId: meta.receiptId,
-      total: meta.total,
-      type: meta.type,
-    },
-  };
-
-  const response = await fetch('/api/receipts', {
+const persistReceipt = async (imageData, fileBase, data) => {
+  const totals = data.type === 'taxi'
+    ? computeTaxiTotals(data.taxiCharges)
+    : computeRetailTotals(data.items, data.taxRate, data.discount);
+  const response = await fetch('api/receipts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    signal: window.AbortSignal?.timeout?.(30000),
+    body: JSON.stringify({
+      imageData, fileName: fileBase,
+      meta: { storeName: data.storeName, receiptId: data.receiptId, type: data.type, total: totals.total },
+    }),
   });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message);
-  }
-
+  if (!response.ok) throw new Error('Server save failed');
   return response.json();
 };
 
-const optionallyPersistReceipt = async (data, totals, dataUrl, fileBase) => {
-  if (!dom.enableServerSave?.checked || !serverAvailable) {
-    dom.outputPanel.hidden = false;
-    dom.saveStatus.textContent = 'Generated locally. Server save disabled.';
-    return;
-  }
-
-  try {
-    const response = await persistReceipt(dataUrl, fileBase, {
-      storeName: data.storeName,
-      receiptId: data.receiptId,
-      total: totals.total,
-      type: data.type,
-    });
-    dom.saveStatus.textContent = `Saved copy inside container as /${response.relativePath}`;
-  } catch (saveError) {
-    console.error('Failed to save receipt to disk', saveError);
-    dom.saveStatus.textContent = 'Generated receipt, but failed to save a copy to disk.';
-  } finally {
-    dom.outputPanel.hidden = false;
-  }
-};
-
-const updateServerStatus = ({ available, message, canEnable }) => {
-  serverAvailable = available;
-  if (!dom.serverStatus) return;
-  dom.serverStatus.textContent = message;
-  dom.serverStatus.classList.toggle('status-ok', available);
-  dom.serverStatus.classList.toggle('status-error', !available);
-  if (dom.enableServerSave) {
-    dom.enableServerSave.disabled = !canEnable;
-    if (!canEnable) {
-      dom.enableServerSave.checked = false;
-    }
-  }
-};
-
 const checkServerAvailability = async () => {
-  if (!window.fetch) {
-    updateServerStatus({
-      available: false,
-      canEnable: false,
-      message: 'Browser missing fetch support, running locally.',
-    });
-    return;
-  }
+  // Pages is static. It should never need to probe the account's /api route.
+  if (location.protocol === 'file:' || location.hostname.endsWith('.github.io')) return;
   try {
-    const response = await fetch('/api/health', { cache: 'no-store' });
-    if (!response.ok) throw new Error('Health check failed');
-    updateServerStatus({
-      available: true,
-      canEnable: true,
-      message: 'Backend ready. Enable server save if desired.',
-    });
-  } catch (error) {
-    console.warn('Server unavailable', error);
-    updateServerStatus({
-      available: false,
-      canEnable: false,
-      message: 'Backend unavailable. Downloads still work.',
-    });
+    const response = await fetch('api/health', { cache: 'no-store', signal: window.AbortSignal?.timeout?.(4000) });
+    if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) return;
+    const health = await response.json();
+    if (health?.status === 'ok') {
+      byId('enable-server-save').disabled = false;
+      byId('server-option').hidden = false;
+    }
+  } catch {
+    // Downloads work offline and on static hosts.
   }
 };
 
-const buildFileBase = (data) => {
-  const parts = [data.storeName, data.receiptId].map(slugify).filter(Boolean);
-  const stamp = new Date().toISOString().slice(0, 10);
-  return parts.length ? `${parts.join('-')}-${stamp}` : `receipt-${stamp}`;
+const showStatus = (message, { error = false, downloads = false } = {}) => {
+  byId('output-panel').hidden = false;
+  byId('output-panel').toggleAttribute('data-error', error);
+  byId('save-status').textContent = message;
+  byId('repeat-downloads').hidden = !downloads;
 };
 
 const handleGenerate = async (event) => {
   event.preventDefault();
   if (isGenerating) return;
-
   const data = getFormData();
-  const isTaxi = data.type === 'taxi';
-  const hasContent = isTaxi ? hasTaxiCharges(data.taxiCharges) : data.items.length > 0;
-
-  if (!hasContent) {
-    alert(
-      isTaxi
-        ? 'Add fare details before generating a taxi receipt.'
-        : 'Add at least one line item before generating a receipt.'
-    );
+  if (data.type === 'retail' && !data.items.length) {
+    showStatus('Add a line item before exporting.', { error: true });
+    byId('add-item').focus();
     return;
   }
-  const totals = isTaxi
-    ? computeTaxiTotals(data.taxiCharges)
-    : computeRetailTotals(data.items, data.taxRate, data.discount);
+  if (data.type === 'taxi' && computeTaxiTotals(data.taxiCharges).total <= 0) {
+    showStatus('Enter a fare or tip before exporting.', { error: true });
+    byId('taxi-base-fare').focus();
+    return;
+  }
 
+  const direct = event.submitter?.name === 'format' ? event.submitter.value : null;
+  const png = direct ? direct === 'png' : byId('auto-download-png').checked;
+  const pdf = direct ? direct === 'pdf' : byId('auto-download-pdf').checked;
+  const save = !direct && !byId('enable-server-save').disabled && byId('enable-server-save').checked;
   isGenerating = true;
-  dom.generateBtn.disabled = true;
-  dom.generateBtn.textContent = 'Generating...';
-  dom.saveStatus.textContent = '';
+  formatButtons.forEach((button) => { button.disabled = true; });
+  byId('generate-btn').textContent = 'Exporting…';
+  byId('output-panel').hidden = true;
 
   try {
-    const canvas = await html2canvas(dom.receipt, {
-      scale: window.devicePixelRatio < 2 ? 2 : window.devicePixelRatio,
-      backgroundColor: '#ffffff',
-    });
-
+    const canvas = await captureReceipt();
     const dataUrl = canvas.toDataURL('image/png');
-    const fileBase = buildFileBase({
-      storeName: data.storeName,
-      receiptId: data.receiptId,
-    });
-    lastImageDataUrl = dataUrl;
-    lastCanvasDimensions = { width: canvas.width, height: canvas.height };
-    lastFileBase = fileBase;
-
-    if (dom.autoPng.checked) {
-      downloadPng(dataUrl, fileBase);
+    if (!dataUrl.startsWith('data:image/png;')) throw new Error('The browser could not create the image');
+    const fileBase = buildFileBase(data);
+    if (png) downloadPng(dataUrl, fileBase);
+    if (pdf) downloadPdf(dataUrl, fileBase, canvas);
+    let message = 'Receipt ready.';
+    if (png || pdf) message = png && pdf ? 'PNG and PDF downloads started.' : (png ? 'PNG' : 'PDF') + ' download started.';
+    if (save) {
+      try {
+        const saved = await persistReceipt(dataUrl, fileBase, data);
+        message += ' Server copy saved to ' + saved.relativePath + '.';
+      } catch {
+        showStatus(message + ' Could not confirm the server copy.', { error: true, downloads: true });
+        return;
+      }
     }
-    if (dom.autoPdf.checked) {
-      downloadPdf(dataUrl, fileBase, canvas.width, canvas.height);
-    }
-
-    await optionallyPersistReceipt(data, totals, dataUrl, fileBase);
+    showStatus(message, { downloads: true });
   } catch (error) {
-    console.error(error);
-    dom.saveStatus.textContent = 'Generation failed. Check console for details.';
-    dom.outputPanel.hidden = false;
+    console.error('Receipt export failed', error);
+    showStatus('Export failed. Please try again.', { error: true });
   } finally {
     isGenerating = false;
-    dom.generateBtn.disabled = false;
-    dom.generateBtn.textContent = 'Generate receipt';
+    formatButtons.forEach((button) => { button.disabled = false; });
+    byId('generate-btn').textContent = 'Export receipt';
   }
 };
 
-const init = () => {
-  dom.purchaseDate.value = toInputDateTime(new Date());
-  setTaxiDefaults();
-  setActiveTemplate(dom.receiptType.value || 'retail');
-  defaultItems.forEach((item) => addItemRow(item));
+const now = new Date();
+byId('purchase-datetime').value = toInputDateTime(now);
+byId('taxi-pickup-time').value = toInputDateTime(now);
+byId('taxi-dropoff-time').value = toInputDateTime(new Date(now.getTime() + 20 * 60 * 1000));
+defaultItems.forEach(addItemRow);
+setActiveTemplate();
+renderPreview();
+
+byId('add-item').addEventListener('click', () => {
+  const row = addItemRow();
+  row.querySelector('input').focus();
   renderPreview();
-
-  dom.addItem.addEventListener('click', () => addItemRow({ qty: 1, price: 0 }));
-  dom.receiptType.addEventListener('change', renderPreview);
-  dom.form.addEventListener('input', renderPreview);
-  dom.form.addEventListener('submit', handleGenerate);
-
-  dom.downloadPngBtn.addEventListener('click', () => {
-    if (!lastImageDataUrl) return alert('Generate a receipt first.');
-    downloadPng(lastImageDataUrl, lastFileBase);
-  });
-
-  dom.downloadPdfBtn.addEventListener('click', () => {
-    if (!lastImageDataUrl) return alert('Generate a receipt first.');
-    downloadPdf(
-      lastImageDataUrl,
-      lastFileBase,
-      lastCanvasDimensions.width,
-      lastCanvasDimensions.height
-    );
-  });
-
-  checkServerAvailability();
-};
-
-init();
+});
+byId('receipt-type').addEventListener('change', () => {
+  setActiveTemplate();
+  renderPreview();
+});
+form.addEventListener('input', renderPreview);
+form.addEventListener('invalid', (event) => {
+  const section = event.target.closest('details');
+  if (section) section.open = true;
+}, true);
+form.addEventListener('submit', handleGenerate);
+checkServerAvailability();
