@@ -1,14 +1,13 @@
 # Receipt Generator
 
-Local-first web UI that lets you craft realistic retail receipts, export them to PNG/PDF, and automatically keep a copy on disk (ideal for bind-mounted Docker volumes).
+Create a retail or taxi receipt in your browser and download it as a PNG, an 80 mm PDF, or both.
 
 ## Features
 - Live preview that matches receipt paper styling (monospaced, dotted dividers, barcode stub).
 - Dynamic line items with quantity/price math, taxes, and discounts.
 - Toggleable templates for Retail vs Taxi receipts (ride metadata + fare builder) without overloading the UI.
-- One-click PNG/PDF export powered by `html2canvas` + `jsPDF`.
-- Optional backend persistence: health-check gate keeps the UI in front-end-only mode (safe for GitHub Pages) until a server is reachable.
-- Automatic persistence to `data/receipts/` (or any directory via `RECEIPT_OUTPUT_DIR`), so containers with attached volumes always retain generated receipts.
+- PNG and PDF downloads capture the current receipt, including items beyond the visible preview.
+- The optional Express server can save a PNG to `data/receipts/` or the directory set by `RECEIPT_OUTPUT_DIR`.
 
 ## Local development
 ```bash
@@ -17,13 +16,11 @@ npm start
 # visits http://localhost:3000
 ```
 
-Receipts are saved as timestamped PNG files in `data/receipts/`.
+Select **Save a copy on the server** to store a timestamped PNG when you export.
 
 ### Front-end-only / GitHub Pages mode
-- The UI serves fine as static files (e.g., GitHub Pages) because PNG/PDF generation runs entirely in-browser.
-- A backend health check runs on load:
-  - If `/api/health` responds, the “Save a copy to server volume” checkbox becomes available.
-  - On static hosts the toggle stays disabled, preventing failed requests while still allowing downloads.
+- GitHub Pages runs both downloads entirely in the browser.
+- On other HTTP hosts, the editor checks `api/health` relative to the app. A healthy JSON response enables optional server saving.
 
 ## Docker
 ```bash
@@ -45,7 +42,7 @@ docker run -d --name receiptgen \
 By default the server listens on `PORT` (defaults to 3000) and writes receipts to `RECEIPT_OUTPUT_DIR` (defaults to `/app/data/receipts`). Override either variable when launching the container if needed.
 
 ## GitHub Pages deployment
-Pushes to `main` automatically run `.github/workflows/deploy-pages.yml`, which copies the static assets from `public/` and publishes them to the `gh-pages` environment using the official Pages actions. One-time setup:
+Pushes to `main` automatically run `.github/workflows/deploy-pages.yml`, which copies the static assets from `public/` and publishes them to the `github-pages` environment using the official Pages actions. One-time setup:
 1. In the repo settings → Pages, set the source to “GitHub Actions”.
 2. Merge/push to `main`; the workflow uploads the `dist/` artifact and deploys it.
 
